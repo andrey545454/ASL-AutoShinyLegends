@@ -114,10 +114,6 @@ source/
 - Keep UI/input code separate from the timing-critical gate callbacks.
 - Avoid framework lifecycle/destructor behavior during title teardown.
 
-## Credits
-
-The standalone framebuffer/HID hooking approach is based on the raw 3GX portable-hook reference used during development. The shiny-gate logic was ported from the original CTRPluginFramework implementation and then refactored into this standalone project.
-
 ## License
 
 GPL-3.0. See [LICENSE](LICENSE).
