@@ -1,0 +1,17 @@
+Author: ASL-AutoShinyLegends contributors
+
+Version:
+    Major: 1
+    Minor: 0
+    Revision: 0
+
+Targets:
+
+Title: ASL - Auto Shiny Legends
+Summary: Automatic shiny gate for Gen I VC static legendary encounters
+Description: |
+  Standalone raw 3GX plugin for Pokemon Red, Blue and Yellow Virtual Console.
+  Supports Mewtwo, Articuno, Zapdos and Moltres. No CTRPluginFramework dependency.
+Compatibility: Any
+MemorySize: 2MiB
+UsePrivateMemory: false

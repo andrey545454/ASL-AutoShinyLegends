@@ -1,0 +1,12 @@
+# Build output
+build/
+*.3gx
+*.elf
+*.map
+*.o
+*.d
+
+# Editor / OS files
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,70 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ASL-AutoShinyLegends
+    runs-on: ubuntu-latest
+
+    # Pin the devkitPro image so CI does not unexpectedly change when
+    # the floating "latest" tag is updated.
+    container: devkitpro/devkitarm:20260610
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 3gxtool is not included in the official devkitARM image.
+      # Build the v1.3 release from source and place it on devkitPro's PATH.
+      - name: Build and install 3gxtool
+        run: |
+          set -eux
+
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates cmake g++ git make
+
+          git clone \
+            --branch v1.3 \
+            --depth 1 \
+            --recurse-submodules \
+            --shallow-submodules \
+            https://gitlab.com/thepixellizeross/3gxtool.git \
+            /tmp/3gxtool
+
+          cmake -S /tmp/3gxtool -B /tmp/3gxtool/build \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/3gxtool/build --config Release -j"$(nproc)"
+
+          install -m755 \
+            "$(find /tmp/3gxtool/build -name 3gxtool -type f -perm -u+x | head -n1)" \
+            /opt/devkitpro/tools/bin/3gxtool
+
+      - name: Build and verify plugin
+        run: |
+          set -eux
+          make clean
+          make verify
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ASL-AutoShinyLegends
+          path: ASL-AutoShinyLegends.3gx
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ASL-AutoShinyLegends.3gx
+          generate_release_notes: true
