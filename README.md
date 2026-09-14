@@ -2,7 +2,29 @@
 
 **ASL (Auto Shiny Legends)** is a standalone raw `.3gx` plugin for the Nintendo 3DS Virtual Console releases of **Pokémon Red, Blue and Yellow**.
 
-It automatically waits at the final battle-start `DelayFrame` until the upcoming Gen I DV pair is shiny-compatible, then releases the game normally. The current build targets the four static legendary encounters:
+It automatically searches for shiny-compatible DVs during supported
+legendary encounters without modifying the generated DVs or RNG state.
+
+<p align="center">
+  <img src="docs/images/asl-verified.png"
+       alt="ASL verifying shiny-compatible DVs on a legendary encounter"
+       width="400">
+</p>
+
+<p align="center">
+  <strong>Automatically search for shiny-compatible legendary encounters and verify the generated DVs.</strong>
+</p>
+
+<p align="center">
+  <img src="docs/images/asl-ready.png"
+       alt="ASL ready for a legendary encounter"
+       width="400">
+  <img src="docs/images/asl-searching.png"
+       alt="ASL searching for shiny-compatible DVs"
+       width="400">
+</p>
+
+The current build supports:
 
 | Pokémon | Gen I internal species ID |
 | --- | ---: |
