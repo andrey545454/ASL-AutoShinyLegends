@@ -1,12 +1,10 @@
 #include "asl_overlay.h"
 
 #include <stdio.h>
-
 #define SCREEN_WIDTH  400
 #define SCREEN_HEIGHT 240
 #define PANEL_X       5
 #define PANEL_Y       5
-#define PANEL_WIDTH   170
 #define LINE_HEIGHT   9
 
 typedef struct Color
@@ -16,15 +14,13 @@ typedef struct Color
     u8 b;
 } Color;
 static const Color k_white      = {255, 255, 255};
-static const Color k_muted      = {180, 180, 180};
+static const Color k_muted      = {255, 190, 80};
 static const Color k_info       = {200, 220, 255};
 static const Color k_ready      = {180, 255, 180};
 static const Color k_warning    = {255, 230, 120};
 static const Color k_error      = {255, 120, 120};
 static const Color k_warm       = {255, 180, 120};
 static const Color k_success    = {120, 255, 150};
-static const Color k_accent     = { 80, 190, 255};
-
 static u16 pack_rgb565(Color color)
 {
     return (u16)(((u16)(color.r >> 3) << 11) |
@@ -39,7 +35,6 @@ static u16 pack_rgb5a1(Color color)
                  ((u16)(color.b >> 3) << 1) |
                  1u);
 }
-
 static u16 pack_rgba4(Color color)
 {
     return (u16)(((u16)(color.r >> 4) << 12) |
@@ -105,129 +100,6 @@ static void put_pixel(
         pixel[3] = color.r;
     }
 }
-
-static void fill_rect(
-    u8 *framebuffer,
-    u32 stride,
-    u32 format,
-    int x,
-    int y,
-    int width,
-    int height,
-    Color color)
-{
-    int px;
-    int py;
-
-    for (px = x; px < x + width; ++px)
-    {
-        for (py = y; py < y + height; ++py)
-            put_pixel(framebuffer, stride, format, px, py, color);
-    }
-}
-
-/*
- * Darken the game's existing framebuffer by 25% without replacing it.
- * This leaves roughly 75% of the game's original brightness visible under
- * the HUD while keeping text and accent bars fully opaque and readable.
- */
-static void darken_pixel_25(
-    u8 *framebuffer,
-    u32 stride,
-    u32 format,
-    int x,
-    int y)
-{
-    if (!framebuffer ||
-        x < 0 || x >= SCREEN_WIDTH ||
-        y < 0 || y >= SCREEN_HEIGHT)
-    {
-        return;
-    }
-
-    format &= 0x0Fu;
-    if (format == GSP_BGR8_OES)
-    {
-        u8 *pixel = framebuffer +
-            stride * (u32)x +
-            (u32)(SCREEN_HEIGHT - 1 - y) * 3u;
-        pixel[0] = (u8)(((u32)pixel[0] * 3u) >> 2);
-        pixel[1] = (u8)(((u32)pixel[1] * 3u) >> 2);
-        pixel[2] = (u8)(((u32)pixel[2] * 3u) >> 2);
-    }
-    else if (format == GSP_RGB565_OES)
-    {
-        u16 *pixel = (u16 *)(framebuffer +
-            stride * (u32)x +
-            (u32)(SCREEN_HEIGHT - 1 - y) * 2u);
-        const u16 value = *pixel;
-        const u16 r = (u16)((value >> 11) & 0x1Fu);
-        const u16 g = (u16)((value >> 5) & 0x3Fu);
-        const u16 b = (u16)(value & 0x1Fu);
-        *pixel = (u16)(((((r * 3u) >> 2) & 0x1Fu) << 11) |
-                       ((((g * 3u) >> 2) & 0x3Fu) << 5) |
-                       (((b * 3u) >> 2) & 0x1Fu));
-    }
-    else if (format == GSP_RGB5_A1_OES)
-    {
-        u16 *pixel = (u16 *)(framebuffer +
-            stride * (u32)x +
-            (u32)(SCREEN_HEIGHT - 1 - y) * 2u);
-        const u16 value = *pixel;
-        const u16 r = (u16)((value >> 11) & 0x1Fu);
-        const u16 g = (u16)((value >> 6) & 0x1Fu);
-        const u16 b = (u16)((value >> 1) & 0x1Fu);
-        const u16 a = (u16)(value & 1u);
-        *pixel = (u16)(((((r * 3u) >> 2) & 0x1Fu) << 11) |
-                       ((((g * 3u) >> 2) & 0x1Fu) << 6) |
-                       ((((b * 3u) >> 2) & 0x1Fu) << 1) |
-                       a);
-    }
-    else if (format == GSP_RGBA4_OES)
-    {
-        u16 *pixel = (u16 *)(framebuffer +
-            stride * (u32)x +
-            (u32)(SCREEN_HEIGHT - 1 - y) * 2u);
-        const u16 value = *pixel;
-        const u16 r = (u16)((value >> 12) & 0xFu);
-        const u16 g = (u16)((value >> 8) & 0xFu);
-        const u16 b = (u16)((value >> 4) & 0xFu);
-        const u16 a = (u16)(value & 0xFu);
-        *pixel = (u16)(((((r * 3u) >> 2) & 0xFu) << 12) |
-                       ((((g * 3u) >> 2) & 0xFu) << 8) |
-                       ((((b * 3u) >> 2) & 0xFu) << 4) |
-                       a);
-    }
-    else if (format == GSP_RGBA8_OES)
-    {
-        u8 *pixel = framebuffer +
-            stride * (u32)x +
-            (u32)(SCREEN_HEIGHT - 1 - y) * 4u;
-        pixel[1] = (u8)(((u32)pixel[1] * 3u) >> 2);
-        pixel[2] = (u8)(((u32)pixel[2] * 3u) >> 2);
-        pixel[3] = (u8)(((u32)pixel[3] * 3u) >> 2);
-    }
-}
-
-static void darken_rect_25(
-    u8 *framebuffer,
-    u32 stride,
-    u32 format,
-    int x,
-    int y,
-    int width,
-    int height)
-{
-    int px;
-    int py;
-
-    for (px = x; px < x + width; ++px)
-    {
-        for (py = y; py < y + height; ++py)
-            darken_pixel_25(framebuffer, stride, format, px, py);
-    }
-}
-
 /* Compact 5x7 font. Each row uses bits 4..0. */
 static const u8 k_digits[10][7] = {
     {0x0E,0x11,0x13,0x15,0x19,0x11,0x0E},
@@ -241,7 +113,6 @@ static const u8 k_digits[10][7] = {
     {0x0E,0x11,0x11,0x0E,0x11,0x11,0x0E},
     {0x0E,0x11,0x11,0x0F,0x01,0x01,0x0E}
 };
-
 static const u8 k_letters[26][7] = {
     {0x0E,0x11,0x11,0x1F,0x11,0x11,0x11},
     {0x1E,0x11,0x11,0x1E,0x11,0x11,0x1E},
@@ -270,7 +141,6 @@ static const u8 k_letters[26][7] = {
     {0x11,0x11,0x0A,0x04,0x04,0x04,0x04},
     {0x1F,0x01,0x02,0x04,0x08,0x10,0x1F}
 };
-
 static u8 glyph_row(char character, int row)
 {
     if (row < 0 || row >= 7)
@@ -303,7 +173,6 @@ static u8 glyph_row(char character, int row)
             return 0;
     }
 }
-
 static void draw_character(
     u8 *framebuffer,
     u32 stride,
@@ -333,7 +202,6 @@ static void draw_character(
         }
     }
 }
-
 static void draw_text(
     u8 *framebuffer,
     u32 stride,
@@ -350,7 +218,6 @@ static void draw_text(
         ++text;
     }
 }
-
 static void draw_line(
     u8 *framebuffer,
     u32 stride,
@@ -363,29 +230,6 @@ static void draw_line(
     *y += LINE_HEIGHT;
 }
 
-static int panel_line_count(const AslGateSnapshot *snapshot)
-{
-    if (!snapshot->enabled)
-        return 3;
-    if (!snapshot->hooks_installed)
-        return 4;
-    if (!snapshot->supported)
-        return snapshot->rom_title_seen ? 5 : 4;
-    switch (snapshot->stage)
-    {
-        case ASL_GATE_HOLDING:
-            return snapshot->prediction_valid ? 8 : 7;
-        case ASL_GATE_RELEASED_SHINY:
-            return snapshot->verification_done ? 10 : 9;
-        case ASL_GATE_ABORTED:
-            return 6;
-        case ASL_GATE_READY:
-        case ASL_GATE_ERROR:
-        default:
-            return 5;
-    }
-}
-
 void asl_overlay_render(
     u8 *framebuffer,
     u32 stride,
@@ -394,23 +238,9 @@ void asl_overlay_render(
 {
     char line[64];
     int y = PANEL_Y + 6;
-    int panel_height;
 
     if (!framebuffer || !snapshot)
         return;
-
-    panel_height = 12 + panel_line_count(snapshot) * LINE_HEIGHT;
-    darken_rect_25(
-        framebuffer, stride, format,
-        PANEL_X, PANEL_Y, PANEL_WIDTH, panel_height);
-    fill_rect(
-        framebuffer, stride, format,
-        PANEL_X, PANEL_Y, PANEL_WIDTH, 2,
-        k_accent);
-    fill_rect(
-        framebuffer, stride, format,
-        PANEL_X, PANEL_Y + panel_height - 2, PANEL_WIDTH, 2,
-        k_accent);
 
     draw_line(
         framebuffer, stride, format, &y,
