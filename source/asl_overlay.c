@@ -6,7 +6,7 @@
 #define SCREEN_HEIGHT 240
 #define PANEL_X       5
 #define PANEL_Y       5
-#define PANEL_WIDTH   230
+#define PANEL_WIDTH   170
 #define LINE_HEIGHT   9
 
 typedef struct Color
@@ -15,7 +15,6 @@ typedef struct Color
     u8 g;
     u8 b;
 } Color;
-
 static const Color k_white      = {255, 255, 255};
 static const Color k_muted      = {180, 180, 180};
 static const Color k_info       = {200, 220, 255};
@@ -25,7 +24,6 @@ static const Color k_error      = {255, 120, 120};
 static const Color k_warm       = {255, 180, 120};
 static const Color k_success    = {120, 255, 150};
 static const Color k_accent     = { 80, 190, 255};
-static const Color k_black      = {  0,   0,   0};
 
 static u16 pack_rgb565(Color color)
 {
@@ -66,7 +64,6 @@ static void put_pixel(
     }
 
     format &= 0x0Fu;
-
     if (format == GSP_BGR8_OES)
     {
         u8 *pixel = framebuffer +
@@ -129,6 +126,108 @@ static void fill_rect(
     }
 }
 
+/*
+ * Darken the game's existing framebuffer by 25% without replacing it.
+ * This leaves roughly 75% of the game's original brightness visible under
+ * the HUD while keeping text and accent bars fully opaque and readable.
+ */
+static void darken_pixel_25(
+    u8 *framebuffer,
+    u32 stride,
+    u32 format,
+    int x,
+    int y)
+{
+    if (!framebuffer ||
+        x < 0 || x >= SCREEN_WIDTH ||
+        y < 0 || y >= SCREEN_HEIGHT)
+    {
+        return;
+    }
+
+    format &= 0x0Fu;
+    if (format == GSP_BGR8_OES)
+    {
+        u8 *pixel = framebuffer +
+            stride * (u32)x +
+            (u32)(SCREEN_HEIGHT - 1 - y) * 3u;
+        pixel[0] = (u8)(((u32)pixel[0] * 3u) >> 2);
+        pixel[1] = (u8)(((u32)pixel[1] * 3u) >> 2);
+        pixel[2] = (u8)(((u32)pixel[2] * 3u) >> 2);
+    }
+    else if (format == GSP_RGB565_OES)
+    {
+        u16 *pixel = (u16 *)(framebuffer +
+            stride * (u32)x +
+            (u32)(SCREEN_HEIGHT - 1 - y) * 2u);
+        const u16 value = *pixel;
+        const u16 r = (u16)((value >> 11) & 0x1Fu);
+        const u16 g = (u16)((value >> 5) & 0x3Fu);
+        const u16 b = (u16)(value & 0x1Fu);
+        *pixel = (u16)(((((r * 3u) >> 2) & 0x1Fu) << 11) |
+                       ((((g * 3u) >> 2) & 0x3Fu) << 5) |
+                       (((b * 3u) >> 2) & 0x1Fu));
+    }
+    else if (format == GSP_RGB5_A1_OES)
+    {
+        u16 *pixel = (u16 *)(framebuffer +
+            stride * (u32)x +
+            (u32)(SCREEN_HEIGHT - 1 - y) * 2u);
+        const u16 value = *pixel;
+        const u16 r = (u16)((value >> 11) & 0x1Fu);
+        const u16 g = (u16)((value >> 6) & 0x1Fu);
+        const u16 b = (u16)((value >> 1) & 0x1Fu);
+        const u16 a = (u16)(value & 1u);
+        *pixel = (u16)(((((r * 3u) >> 2) & 0x1Fu) << 11) |
+                       ((((g * 3u) >> 2) & 0x1Fu) << 6) |
+                       ((((b * 3u) >> 2) & 0x1Fu) << 1) |
+                       a);
+    }
+    else if (format == GSP_RGBA4_OES)
+    {
+        u16 *pixel = (u16 *)(framebuffer +
+            stride * (u32)x +
+            (u32)(SCREEN_HEIGHT - 1 - y) * 2u);
+        const u16 value = *pixel;
+        const u16 r = (u16)((value >> 12) & 0xFu);
+        const u16 g = (u16)((value >> 8) & 0xFu);
+        const u16 b = (u16)((value >> 4) & 0xFu);
+        const u16 a = (u16)(value & 0xFu);
+        *pixel = (u16)(((((r * 3u) >> 2) & 0xFu) << 12) |
+                       ((((g * 3u) >> 2) & 0xFu) << 8) |
+                       ((((b * 3u) >> 2) & 0xFu) << 4) |
+                       a);
+    }
+    else if (format == GSP_RGBA8_OES)
+    {
+        u8 *pixel = framebuffer +
+            stride * (u32)x +
+            (u32)(SCREEN_HEIGHT - 1 - y) * 4u;
+        pixel[1] = (u8)(((u32)pixel[1] * 3u) >> 2);
+        pixel[2] = (u8)(((u32)pixel[2] * 3u) >> 2);
+        pixel[3] = (u8)(((u32)pixel[3] * 3u) >> 2);
+    }
+}
+
+static void darken_rect_25(
+    u8 *framebuffer,
+    u32 stride,
+    u32 format,
+    int x,
+    int y,
+    int width,
+    int height)
+{
+    int px;
+    int py;
+
+    for (px = x; px < x + width; ++px)
+    {
+        for (py = y; py < y + height; ++py)
+            darken_pixel_25(framebuffer, stride, format, px, py);
+    }
+}
+
 /* Compact 5x7 font. Each row uses bits 4..0. */
 static const u8 k_digits[10][7] = {
     {0x0E,0x11,0x13,0x15,0x19,0x11,0x0E},
@@ -180,7 +279,6 @@ static u8 glyph_row(char character, int row)
         return k_digits[(int)(character - '0')][row];
     if (character >= 'A' && character <= 'Z')
         return k_letters[(int)(character - 'A')][row];
-
     switch (character)
     {
         case ':':
@@ -217,7 +315,6 @@ static void draw_character(
 {
     int row;
     int column;
-
     for (row = 0; row < 7; ++row)
     {
         const u8 bits = glyph_row(character, row);
@@ -274,7 +371,6 @@ static int panel_line_count(const AslGateSnapshot *snapshot)
         return 4;
     if (!snapshot->supported)
         return snapshot->rom_title_seen ? 5 : 4;
-
     switch (snapshot->stage)
     {
         case ASL_GATE_HOLDING:
@@ -304,11 +400,9 @@ void asl_overlay_render(
         return;
 
     panel_height = 12 + panel_line_count(snapshot) * LINE_HEIGHT;
-
-    fill_rect(
+    darken_rect_25(
         framebuffer, stride, format,
-        PANEL_X, PANEL_Y, PANEL_WIDTH, panel_height,
-        k_black);
+        PANEL_X, PANEL_Y, PANEL_WIDTH, panel_height);
     fill_rect(
         framebuffer, stride, format,
         PANEL_X, PANEL_Y, PANEL_WIDTH, 2,
@@ -322,14 +416,12 @@ void asl_overlay_render(
         framebuffer, stride, format, &y,
         "ASL - AUTO SHINY LEGENDS",
         k_white);
-
     if (!snapshot->enabled)
     {
         draw_line(framebuffer, stride, format, &y, "PLUGIN: OFF", k_warm);
         draw_line(framebuffer, stride, format, &y, "SELECT: ENABLE", k_muted);
         return;
     }
-
     if (!snapshot->hooks_installed)
     {
         draw_line(framebuffer, stride, format, &y, "HOOK ERROR", k_error);
@@ -337,7 +429,6 @@ void asl_overlay_render(
         draw_line(framebuffer, stride, format, &y, "SELECT: DISABLE", k_muted);
         return;
     }
-
     if (!snapshot->supported)
     {
         if (!snapshot->rom_title_seen)
@@ -352,14 +443,12 @@ void asl_overlay_render(
             draw_line(framebuffer, stride, format, &y, line, k_warm);
             draw_line(framebuffer, stride, format, &y, "EXPECTED RED/BLUE/YELLOW", k_muted);
         }
-
         draw_line(framebuffer, stride, format, &y, "SELECT: DISABLE", k_muted);
         return;
     }
 
     snprintf(line, sizeof(line), "GAME: %s", snapshot->game_name);
     draw_line(framebuffer, stride, format, &y, line, k_info);
-
     if (snapshot->target_species != 0u &&
         snapshot->stage != ASL_GATE_READY &&
         snapshot->stage != ASL_GATE_ERROR)
@@ -367,14 +456,12 @@ void asl_overlay_render(
         snprintf(line, sizeof(line), "TARGET: %s", snapshot->target_name);
         draw_line(framebuffer, stride, format, &y, line, k_info);
     }
-
     switch (snapshot->stage)
     {
         case ASL_GATE_READY:
             draw_line(framebuffer, stride, format, &y, "READY - APPROACH LEGENDARY", k_ready);
             draw_line(framebuffer, stride, format, &y, "X: RESET", k_muted);
             break;
-
         case ASL_GATE_HOLDING:
             draw_line(framebuffer, stride, format, &y, "SEARCHING...", k_warning);
             snprintf(
@@ -383,7 +470,6 @@ void asl_overlay_render(
                 "EXTRA VBLANK: %lu",
                 (unsigned long)snapshot->extra_vblanks);
             draw_line(framebuffer, stride, format, &y, line, k_white);
-
             if (snapshot->prediction_valid)
             {
                 snprintf(
@@ -397,7 +483,6 @@ void asl_overlay_render(
 
             draw_line(framebuffer, stride, format, &y, "X: ABORT AND RELEASE", k_error);
             break;
-
         case ASL_GATE_RELEASED_SHINY:
             draw_line(framebuffer, stride, format, &y, "SHINY FOUND - RELEASED", k_success);
             snprintf(
@@ -406,7 +491,6 @@ void asl_overlay_render(
                 "WAITED VBLANK: %lu",
                 (unsigned long)snapshot->extra_vblanks);
             draw_line(framebuffer, stride, format, &y, line, k_white);
-
             snprintf(
                 line,
                 sizeof(line),
@@ -414,7 +498,6 @@ void asl_overlay_render(
                 (unsigned)snapshot->predicted_dv1,
                 (unsigned)snapshot->predicted_dv2);
             draw_line(framebuffer, stride, format, &y, line, k_info);
-
             if (!snapshot->verification_done)
             {
                 draw_line(framebuffer, stride, format, &y, "REAL: WAITING...", k_muted);
@@ -436,7 +519,6 @@ void asl_overlay_render(
                     snapshot->verification_match ? "VERIFIED" : "MISMATCH",
                     snapshot->verification_match ? k_success : k_error);
             }
-
             draw_line(framebuffer, stride, format, &y, "X: CLEAR FOR NEXT RUN", k_muted);
             break;
 
@@ -444,7 +526,6 @@ void asl_overlay_render(
             draw_line(framebuffer, stride, format, &y, "ABORTED - RELEASED", k_warm);
             draw_line(framebuffer, stride, format, &y, "X: CLEAR", k_muted);
             break;
-
         case ASL_GATE_ERROR:
         default:
             draw_line(framebuffer, stride, format, &y, "ERROR", k_error);
