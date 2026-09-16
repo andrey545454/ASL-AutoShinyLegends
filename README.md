@@ -143,14 +143,6 @@ The output is:
 default.3gx
 ```
 
-## Compatibility
-
-ASL depends on specific Nintendo 3DS Virtual Console emulator layouts and specific guest ROM layouts.
-
-The plugin validates the expected hooks/signatures before enabling a backend. If the expected layout is not found, ASL fails open instead of blindly patching unknown code.
-
-Generation I and Generation II use separate backends so changes to Crystal support do not alter the timing-sensitive Gen I search path.
-
 ## Project layout
 
 ```text
