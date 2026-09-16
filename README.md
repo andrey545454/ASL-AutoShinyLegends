@@ -1,19 +1,72 @@
 # ASL-AutoShinyLegends
 
-**ASL (Auto Shiny Legends)** is a standalone raw `.3gx` plugin for the Nintendo 3DS Virtual Console releases of **Pokémon Red, Blue and Yellow**.
+ASL (Auto Shiny Legends) is a standalone raw `.3gx` plugin for the Nintendo 3DS Virtual Console releases of **Pokémon Red, Blue, Yellow, and Crystal**.
 
-It automatically searches for shiny-compatible DVs during supported
-legendary encounters without modifying the generated DVs or RNG state.
+It automatically searches for shiny-compatible legendary encounters by waiting for the correct natural RNG/VBlank state. ASL does **not** write generated DVs and does **not** write RNG state.
+
+Starting with **ASL 2.0.0**, the same `default.3gx` automatically detects whether it is running in a supported Generation I or Generation II game and selects the appropriate backend.
 
 <p align="center">
-  <img src="docs/images/asl-verified.png"
-       alt="ASL verifying shiny-compatible DVs on a legendary encounter"
-       width="400">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="docs/images/asl-mewtwo-verified.png"
+             alt="ASL verifying a shiny-compatible Gen I legendary encounter"
+             width="400">
+      </td>
+      <td align="center">
+        <img src="docs/images/asl-celebi-verified.png"
+             alt="ASL verifying a shiny Celebi encounter in Pokemon Crystal"
+             width="400">
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <sub>Gen I — verified shiny-compatible legendary encounter</sub>
+      </td>
+      <td align="center">
+        <sub>Gen II — verified shiny Celebi encounter</sub>
+      </td>
+    </tr>
+  </table>
 </p>
 
 <p align="center">
-  <strong>Automatically search for shiny-compatible legendary encounters and verify the generated DVs.</strong>
+  <strong>
+    Automatically search for shiny-compatible legendary encounters
+    and verify the generated DVs.
+  </strong>
 </p>
+
+## Installation
+
+1. Build or download `default.3gx`.
+2. Open the SD card and go to:
+
+   ```text
+   /luma/plugins/
+   ```
+
+3. Copy `default.3gx` into that folder.
+
+ASL detects the running game automatically — there are no separate Gen I and Crystal builds.
+
+## Supported games
+
+| Generation | Supported encounters |
+| --- | --- |
+| Gen I | Articuno, Zapdos, Moltres, Mewtwo |
+| Gen II | Celebi |
+
+## How it works
+
+ASL does not force a shiny result by writing DVs into memory.
+
+Instead, it predicts the DVs that the game will naturally generate from its current RNG state. If the upcoming result is not shiny-compatible, ASL allows exactly one real VBlank to occur and checks again.
+
+When a valid shiny-compatible RNG state is found, ASL releases the game and lets the original game code generate the encounter normally.
+
+After generation, ASL reads the real DVs back and compares them with the prediction.
 
 <p align="center">
   <img src="docs/images/asl-ready.png"
@@ -24,117 +77,101 @@ legendary encounters without modifying the generated DVs or RNG state.
        width="400">
 </p>
 
-The current build supports:
-
-| Pokémon | Gen I internal species ID |
-| --- | ---: |
-| Moltres | `0x49` |
-| Articuno | `0x4A` |
-| Zapdos | `0x4B` |
-| Mewtwo | `0x83` |
-
-The project is fully standalone and does **not** depend on CTRPluginFramework.
+<p align="center">
+  <sub>
+    ASL stays out of the way until a supported encounter is detected,
+    then searches one real VBlank at a time.
+  </sub>
+</p>
 
 ## Features
 
-- Pokémon Red, Blue and Yellow ROM detection.
-- Mewtwo, Articuno, Zapdos and Moltres static-encounter support.
-- DIV / `hRandomAdd` prediction without writing RNG state, DVs, WRAM or HRAM.
-- One-real-VBlank-at-a-time hold at the game's existing `DelayFrame`.
+- One `default.3gx` for supported Gen I and Gen II games.
+- Automatic Red / Blue / Yellow / Crystal detection.
+- Automatic shiny-compatible legendary search.
+- One-real-VBlank-at-a-time RNG advancement.
+- No direct writes to generated DVs.
+- No direct writes to RNG state.
+- No repeated `BattleRandom` reroll loop.
 - Post-release `PRED` vs `REAL` DV verification.
-- `SELECT` enable/disable toggle with true gate pass-through while disabled.
+- Transparent framebuffer HUD.
+- `SELECT` enable/disable toggle.
 - `X` abort/reset control.
-- Automatic state reset after:
-  - the in-game `A+B+START+SELECT` soft reset;
-  - the Virtual Console menu **Reset** action.
-- Lightweight framebuffer overlay and HID input hooks.
-- No framework menu, framework renderer or framework hook runtime.
+- Fail-open behavior when a supported layout or signature is not detected.
+- No CTRPluginFramework dependency.
 
 ## Controls
 
 | Button | Action |
 | --- | --- |
-| `SELECT` | Enable or disable ASL. The toggle is applied on release so the Gen I soft-reset chord cannot toggle the plugin accidentally. |
-| `X` while searching | Abort the hold and release the battle. |
-| `X` otherwise | Clear the current result and return to `READY`. |
-| `A+B+START+SELECT` | Game soft reset; ASL clears the current run state while preserving ON/OFF. |
+| `SELECT` | Enable / disable ASL |
+| `X` while searching | Abort the search and release the game |
+| `X` after a result | Clear the result and prepare for the next encounter |
 
-The Virtual Console menu **Reset** is detected from the guest game's initialization sequence and also clears only the current run state.
+ASL starts enabled by default.
 
-## How it works
+## Why `PRED` and `REAL` matter
 
-ASL does not force a shiny value into memory. Instead, it hooks the emulator helpers used for Game Boy `LDH A,(a8)` and `LDH (a8),A` operations.
+`SHINY FOUND - RELEASED` means ASL predicted that the game's next natural DV generation would be shiny-compatible and stopped holding the encounter.
 
-At the exact final `DelayFrame` inside `PlayBattleMusic`, the plugin samples the emulator's divider phase and `hRandomAdd`, predicts the two upcoming `BattleRandom` results that become the enemy DVs, and checks whether that DV pair is shiny-compatible after transfer to Gen II.
+`PRED` shows the DV bytes predicted before release.
 
-If the prediction is not shiny-compatible, ASL changes only the return value of the single `hVBlankOccurred` read from `0` to `1`. The game's own `DelayFrame` therefore performs another normal HALT/VBlank iteration. Once the prediction is shiny-compatible, the real `0` is passed through and battle initialization continues normally.
+`REAL` shows the DV bytes actually written by the game afterward.
 
-After release, ASL waits for the next validated VBlank and reads the generated enemy DVs from WRAM to verify that the prediction matched reality.
+`VERIFIED` is displayed only when the result generated by the game matches the expected shiny-compatible result.
 
-For the low-level hook design and reset-detection details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+This makes it easy to distinguish a correctly predicted natural encounter from a timing mismatch.
 
 ## Build
 
 Requirements:
 
-- devkitPro / devkitARM
-- libctru
-- `3gxtool`
+- devkitPro
+- devkitARM
+- the same raw 3GX build tools used by the original ASL project
 
-From a devkitPro MSYS2 shell:
+Build with:
 
-```sh
+```bash
 make clean
 make verify
 ```
 
-Successful output:
+The output is:
 
 ```text
-ASL-AutoShinyLegends.3gx
+default.3gx
 ```
 
 ## Compatibility
 
-This is intentionally targeted code. The host/emulator addresses, hook signatures and timing constants are for the VC build used during development. The plugin validates the critical ARM hook sites before patching and fails open when they do not match, but a different VC revision may still require new addresses or timing measurements.
+ASL depends on specific Nintendo 3DS Virtual Console emulator layouts and specific guest ROM layouts.
 
-Supported guest ROM titles are currently:
+The plugin validates the expected hooks/signatures before enabling a backend. If the expected layout is not found, ASL fails open instead of blindly patching unknown code.
 
-- `POKEMON RED`
-- `POKEMON BLUE`
-- `POKEMON YELLOW`
+Generation I and Generation II use separate backends so changes to Crystal support do not alter the timing-sensitive Gen I search path.
 
 ## Project layout
 
 ```text
 include/
-  asl_gate.h           Public gate state/UI interface
-  asl_game.h           Game layouts and supported legendary species
-  asl_input.h          HID shared-memory sampling
-  asl_overlay.h        Overlay renderer interface
-  asl_platform.h       Raw process/patching helpers
-  asl_predictor.h      Pure DIV/RNG prediction interface
-  asl_runtime_hooks.h  Framebuffer/HID hook installer
 source/
-  asl_gate.c           Gate state machine and F0/E0 emulator hooks
-  asl_game.c           Red/Blue/Yellow constants and species helpers
-  asl_input.c          Button edge/held-state tracking
-  asl_overlay.c        Direct framebuffer renderer and 5x7 font
-  asl_platform.c       Pattern search, debug output and physical alias helper
-  asl_predictor.c      Divider reconstruction and shiny-DV prediction
-  asl_runtime_hooks.c  Portable framebuffer-present and HID mapping hooks
-  bootloader.s         Raw 3GX entry/host-register preservation
-  csvc.s               Custom SVC wrappers required by raw patching
-  main.c               Minimal initialization entrypoint
+    asl_gate.c          Common backend router
+    asl_gen1.c          Red / Blue / Yellow backend
+    asl_gen2.c          Crystal / Celebi backend
+    asl_overlay.c       HUD rendering
+    asl_runtime_hooks.c 3DS framebuffer / input hooks
+docs/
+    images/
 ```
 
-## Design goals
+## Notes
 
-- Keep game behavior as close to stock as possible.
-- Fail open if prediction or hook assumptions are not valid.
-- Keep build-specific constants isolated and documented.
-- Keep UI/input code separate from the timing-critical gate callbacks.
-- Avoid framework lifecycle/destructor behavior during title teardown.
+ASL is designed around natural RNG progression.
+
+The goal is not to manufacture DVs, but to wait until the game reaches a state where its own original RNG code will produce a shiny-compatible encounter.
+
+Because the search advances one real VBlank at a time, search duration varies naturally from encounter to encounter.
 
 ## License
 

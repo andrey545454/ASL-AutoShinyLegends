@@ -7,13 +7,12 @@ endif
 TOPDIR ?= $(CURDIR)
 include $(DEVKITARM)/3ds_rules
 
-TARGET   := ASL-AutoShinyLegends
+TARGET   := default
 BUILD    := build
 SOURCES  := source
 INCLUDES := include
-PLGINFO  := ASL-AutoShinyLegends.plgInfo
+PLGINFO  := default.plgInfo
 LIBDIRS  := $(CTRULIB)
-
 ARCH     := -march=armv6k -mlittle-endian -mtune=mpcore -mfloat-abi=hard -mtp=soft
 CFLAGS   := -Os -mword-relocations -Wall -Wextra -Werror \
             -fomit-frame-pointer -ffunction-sections -fdata-sections \
@@ -32,7 +31,6 @@ export INCLUDE  := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
                    $(foreach dir,$(LIBDIRS),-I$(dir)/include) \
                    -I$(CURDIR)/$(BUILD)
 export LIBPATHS := $(foreach dir,$(LIBDIRS),-L$(dir)/lib)
-
 CFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 SFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 export OFILES := $(CFILES:.c=.o) $(SFILES:.s=.o)

@@ -13,7 +13,6 @@ SECTIONS
 {
     . = 0x07000100;
     __start__ = .;
-
     .text ALIGN(4) :
     {
         bootloader.o (.text*)
@@ -32,7 +31,6 @@ SECTIONS
         SORT(CONSTRUCTORS)
         . = ALIGN(4);
     } :rodata
-
     .ARM.extab : { *(.ARM.extab* .gnu.linkonce.armextab.*) } :rodata
     __exidx_start = .;
     ARM.exidx : { *(.ARM.exidx* .gnu.linkonce.armexidx.*) } :rodata
@@ -52,7 +50,6 @@ SECTIONS
         . = ALIGN(4);
         __tdata_lma_end = .;
     } :data
-
     .tbss ALIGN(4) :
     {
         *(.tbss) *(.tbss.*) *(.gnu.linkonce.tb.*) *(.tcommon)
@@ -72,7 +69,6 @@ SECTIONS
         KEEP(*(SORT(.init_array.*))) KEEP(*(.init_array))
         PROVIDE(__init_array_end = .);
     } :data
-
     .fini_array ALIGN(4) :
     {
         PROVIDE(__fini_array_start = .);
@@ -86,7 +82,6 @@ SECTIONS
         KEEP(*(EXCLUDE_FILE(*crtend.o) .ctors))
         KEEP(*(SORT(.ctors.*))) KEEP(*(.ctors))
     } :data
-
     .dtors ALIGN(4) :
     {
         KEEP(*crtbegin.o(.dtors))
@@ -108,7 +103,6 @@ SECTIONS
     __end__ = ABSOLUTE(.);
 
     /DISCARD/ : { *(.group .comment .note) }
-
     .stab 0 : { *(.stab) }
     .stabstr 0 : { *(.stabstr) }
     .debug 0 : { *(.debug) }

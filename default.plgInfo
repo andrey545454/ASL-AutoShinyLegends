@@ -1,0 +1,18 @@
+Author: ASL-AutoShinyLegends contributors
+
+Version:
+    Major: 2
+    Minor: 0
+    Revision: 0
+
+Targets:
+
+Title: ASL - Auto Shiny Legends
+Summary: Automatic shiny gate for Pokemon Gen I and Crystal VC
+Description: |
+  Standalone raw 3GX plugin with automatic backend detection.
+  Gen I: Red, Blue and Yellow static legendary encounters.
+  Gen II: Pokemon Crystal Celebi event. No CTRPluginFramework dependency.
+Compatibility: Any
+MemorySize: 2MiB
+UsePrivateMemory: false
